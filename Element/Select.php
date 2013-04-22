@@ -47,11 +47,6 @@ class Select extends Element implements InputProviderInterface
     protected $validator;
 
     /**
-     * @var bool
-     */
-    protected $disableInArrayValidator = false;
-
-    /**
      * Create an empty option (option with label but no value). If set to null, no option is created
      *
      * @var bool
@@ -124,10 +119,6 @@ class Select extends Element implements InputProviderInterface
             $this->setEmptyOption($this->options['empty_option']);
         }
 
-        if (isset($this->options['disable_inarray_validator'])) {
-            $this->setDisableInArrayValidator($this->options['disable_inarray_validator']);
-        }
-
         return $this;
     }
 
@@ -147,28 +138,6 @@ class Select extends Element implements InputProviderInterface
             return $this;
         }
         return parent::setAttribute($key, $value);
-    }
-
-    /**
-     * Set the flag to allow for disabling the automatic addition of an InArray validator.
-     *
-     * @param bool $disableOption
-     * @return Select
-     */
-    public function setDisableInArrayValidator($disableOption)
-    {
-        $this->disableInArrayValidator = (bool) $disableOption;
-        return $this;
-    }
-
-    /**
-     * Get the disable in array validator flag.
-     *
-     * @return bool
-     */
-    public function disableInArrayValidator()
-    {
-        return $this->disableInArrayValidator;
     }
 
     /**
@@ -200,7 +169,7 @@ class Select extends Element implements InputProviderInterface
      */
     protected function getValidator()
     {
-        if (null === $this->validator && !$this->disableInArrayValidator()) {
+        if (null === $this->validator) {
             $validator = new InArrayValidator(array(
                 'haystack' => $this->getValueOptionsValues(),
                 'strict'   => false
@@ -233,13 +202,10 @@ class Select extends Element implements InputProviderInterface
         $spec = array(
             'name' => $this->getName(),
             'required' => true,
+            'validators' => array(
+                $this->getValidator()
+            )
         );
-
-        if ($validator = $this->getValidator()) {
-            $spec['validators'] = array(
-                $validator,
-            );
-        }
 
         return $spec;
     }

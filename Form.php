@@ -12,7 +12,6 @@ namespace Zend\Form;
 use Traversable;
 use Zend\Form\Element\Collection;
 use Zend\Form\Exception;
-use Zend\InputFilter\CollectionInputFilter;
 use Zend\InputFilter\InputFilter;
 use Zend\InputFilter\InputFilterAwareInterface;
 use Zend\InputFilter\InputFilterInterface;
@@ -699,13 +698,7 @@ class Form extends Fieldset implements FormInterface
             }
         }
 
-        if ($fieldset instanceof Collection && $fieldset->getTargetElement() instanceof FieldsetInterface) {
-            $elements = $fieldset->getTargetElement()->getElements();
-        } else {
-            $elements = $fieldset->getElements();
-        }
-
-        foreach ($elements as $element) {
+        foreach ($fieldset->getElements() as $element) {
             $name = $element->getName();
 
             if ($this->preferFormInputFilter && $inputFilter->has($name)) {
@@ -727,21 +720,17 @@ class Form extends Fieldset implements FormInterface
             $inputFilter->add($input, $name);
         }
 
-        foreach ($fieldset->getFieldsets() as $childFieldset) {
-            $name = $childFieldset->getName();
+        foreach ($fieldset->getFieldsets() as $fieldset) {
+            $name = $fieldset->getName();
 
-            if (!$childFieldset instanceof InputFilterProviderInterface) {
+            if (!$fieldset instanceof InputFilterProviderInterface) {
                 if (!$inputFilter->has($name)) {
                     // Add a new empty input filter if it does not exist (or the fieldset's object input filter),
                     // so that elements of nested fieldsets can be recursively added
-                    if ($childFieldset->getObject() instanceof InputFilterAwareInterface) {
-                        $inputFilter->add($childFieldset->getObject()->getInputFilter(), $name);
+                    if ($fieldset->getObject() instanceof InputFilterAwareInterface) {
+                        $inputFilter->add($fieldset->getObject()->getInputFilter(), $name);
                     } else {
-                        if ($fieldset instanceof Collection && $inputFilter instanceof CollectionInputFilter) {
-                            continue;
-                        } else {
-                            $inputFilter->add(new InputFilter(), $name);
-                        }
+                        $inputFilter->add(new InputFilter(), $name);
                     }
                 }
 
@@ -754,7 +743,7 @@ class Form extends Fieldset implements FormInterface
 
                 // Traverse the elements of the fieldset, and attach any
                 // defaults to the fieldset's input filter
-                $this->attachInputFilterDefaults($fieldsetFilter, $childFieldset);
+                $this->attachInputFilterDefaults($fieldsetFilter, $fieldset);
                 continue;
             }
 
@@ -764,12 +753,12 @@ class Form extends Fieldset implements FormInterface
             }
 
             // Create an input filter based on the specification returned from the fieldset
-            $spec   = $childFieldset->getInputFilterSpecification();
+            $spec   = $fieldset->getInputFilterSpecification();
             $filter = $inputFactory->createInputFilter($spec);
             $inputFilter->add($filter, $name);
 
             // Recursively attach sub filters
-            $this->attachInputFilterDefaults($filter, $childFieldset);
+            $this->attachInputFilterDefaults($filter, $fieldset);
         }
     }
 

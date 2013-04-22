@@ -36,7 +36,10 @@ use Zend\EventManager\EventManagerInterface;
 class ElementAnnotationsListener extends AbstractAnnotationsListener
 {
     /**
-     * {@inheritDoc}
+     * Attach listeners
+     *
+     * @param  EventManagerInterface $events
+     * @return void
      */
     public function attach(EventManagerInterface $events)
     {
