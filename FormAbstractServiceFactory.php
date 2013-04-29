@@ -9,9 +9,9 @@
 
 namespace Zend\Form;
 
+use Zend\Form\Factory;
 use Zend\ServiceManager\AbstractFactoryInterface;
 use Zend\ServiceManager\ServiceLocatorInterface;
-use Zend\Form\Factory;
 
 /**
  * Abstract form factory.
@@ -47,8 +47,9 @@ class FormAbstractServiceFactory implements AbstractFactoryInterface
     }
 
     /**
-     * @param array $spec
-     * @return \Zend\Form\FormInterface
+     * @param  ServiceLocatorInterface $serviceLocator
+     * @param  array $spec
+     * @return ElementInterface
      */
     public function createForm(ServiceLocatorInterface $serviceLocator, $spec = array())
     {
@@ -68,7 +69,8 @@ class FormAbstractServiceFactory implements AbstractFactoryInterface
     }
 
     /**
-     * @return \Zend\Form\Factory
+     * @param  ServiceLocatorInterface $serviceLocator
+     * @return Factory
      */
     public function getFormFactory(ServiceLocatorInterface $serviceLocator)
     {
