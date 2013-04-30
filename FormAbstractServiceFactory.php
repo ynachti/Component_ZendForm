@@ -9,77 +9,148 @@
 
 namespace Zend\Form;
 
-use Zend\Form\Factory;
+use Zend\InputFilter\InputFilterInterface;
 use Zend\ServiceManager\AbstractFactoryInterface;
 use Zend\ServiceManager\ServiceLocatorInterface;
 
-/**
- * Abstract form factory.
- *
- * Allow create forms via specification defined in config file.
- * Reserved <b>form</b> section.
- */
 class FormAbstractServiceFactory implements AbstractFactoryInterface
 {
     /**
-     * @var \Zend\Form\Factory
+     * @var array
      */
-    private $formFactory;
+    protected $config;
 
     /**
-     * {@inheritDoc}
+     * @var string Top-level configuration key indicating forms configuration
      */
-    public function canCreateServiceWithName(ServiceLocatorInterface $serviceLocator, $name, $requestedName)
-    {
-        $config = $serviceLocator->get('Config');
+    protected $configKey     = 'forms';
 
-        return isset($config['form'][$requestedName]);
+    /**
+     * @var Factory Form factory used to create forms
+     */
+    protected $factory;
+
+    /**
+     * Can we create the requested service?
+     *
+     * @param  ServiceLocatorInterface $services
+     * @param  string $name Service name (as resolved by ServiceManager)
+     * @param  string $rName Name by which service was requested
+     * @return bool
+     */
+    public function canCreateServiceWithName(ServiceLocatorInterface $services, $name, $rName)
+    {
+        $config = $this->getConfig($services);
+        if (empty($config)) {
+            return false;
+        }
+
+        return (isset($config[$rName]) && is_array($config[$rName]) && !empty($config[$rName]));
     }
 
     /**
-     * {@inheritDoc}
+     * Create a form
+     *
+     * @param  ServiceLocatorInterface $services
+     * @param  string $name Service name (as resolved by ServiceManager)
+     * @param  string $rName Name by which service was requested
+     * @return Form
      */
-    public function createServiceWithName(ServiceLocatorInterface $serviceLocator, $name, $requestedName)
+    public function createServiceWithName(ServiceLocatorInterface $services, $name, $rName)
     {
-        $config = $serviceLocator->get('Config');
+        $config  = $this->getConfig($services);
+        $config  = $config[$rName];
+        $factory = $this->getFormFactory($services);
 
-        return $this->createForm($serviceLocator, $config['form'][$requestedName]);
+        $this->marshalInputFilter($config, $services, $factory);
+        return $factory->createForm($config);
     }
 
     /**
-     * @param  ServiceLocatorInterface $serviceLocator
-     * @param  array $spec
-     * @return ElementInterface
+     * Get forms configuration, if any
+     *
+     * @param  ServiceLocatorInterface $services
+     * @return array
      */
-    public function createForm(ServiceLocatorInterface $serviceLocator, $spec = array())
+    protected function getConfig(ServiceLocatorInterface $services)
     {
-        $factory = $this->getFormFactory($serviceLocator);
-        $form = $factory->create($spec);
-        $form->setFormFactory($factory);
+        if ($this->config !== null) {
+            return $this->config;
+        }
 
-        return $form;
+        if (!$services->has('Config')) {
+            $this->config = array();
+            return $this->config;
+        }
+
+        $config = $services->get('Config');
+        if (!isset($config[$this->configKey])
+            || !is_array($config[$this->configKey])
+        ) {
+            $this->config = array();
+            return $this->config;
+        }
+
+        $this->config = $config[$this->configKey];
+        return $this->config;
     }
 
     /**
-     * @param Factory $formFactory
-     */
-    public function setFormFactory(Factory $formFactory)
-    {
-        $this->formFactory = $formFactory;
-    }
-
-    /**
-     * @param  ServiceLocatorInterface $serviceLocator
+     * Retrieve the form factory, creating it if necessary
+     *
+     * @param  ServiceLocatorInterface $services
      * @return Factory
      */
-    public function getFormFactory(ServiceLocatorInterface $serviceLocator)
+    protected function getFormFactory(ServiceLocatorInterface $services)
     {
-        if (null === $this->formFactory) {
-            $formElementManager = $serviceLocator->has('Zend\Form\FormElementManager')
-                ? $serviceLocator->get('Zend\Form\FormElementManager') : null;
-
-            $this->setFormFactory(new Factory($formElementManager));
+        if ($this->factory instanceof Factory) {
+            return $this->factory;
         }
-        return $this->formFactory;
+
+        $elements = null;
+        if ($services->has('FormElementManager')) {
+            $elements = $services->get('FormElementManager');
+        }
+
+        $this->factory = new Factory($elements);
+        return $this->factory;
+    }
+
+    /**
+     * Marshal the input filter into the configuration
+     *
+     * If an input filter is specified:
+     * - if the InputFilterManager is present, checks if it's there; if so,
+     *   retrieves it and resets the specification to the instance.
+     * - otherwise, pulls the input filter factory from the form factory, and
+     *   attaches the FilterManager and ValidatorManager to it.
+     *
+     * @param array $config
+     * @param ServiceLocatorInterface $services
+     * @param Factory $formFactory
+     */
+    protected function marshalInputFilter(array &$config, ServiceLocatorInterface $services, Factory $formFactory)
+    {
+        if (!isset($config['input_filter'])) {
+            return;
+        }
+
+        if ($config['input_filter'] instanceof InputFilterInterface) {
+            return;
+        }
+
+        if (is_string($config['input_filter'])
+            && $services->has('InputFilterManager')
+        ) {
+            $inputFilters = $services->get('InputFilterManager');
+            if ($inputFilters->has($config['input_filter'])) {
+                $config['input_filter'] = $inputFilters->get($config['input_filter']);
+                return;
+            }
+        }
+
+        $inputFilterFactory = $formFactory->getInputFilterFactory();
+        $inputFilterFactory->getDefaultFilterChain()->setPluginManager($services->get('FilterManager'));
+        $inputFilterFactory->getDefaultValidatorChain()->setPluginManager($services->get('ValidatorManager'));
     }
 }
